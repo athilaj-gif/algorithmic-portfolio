@@ -504,10 +504,20 @@ DASHBOARD_TEMPLATE = """
                     Benchmark Comparison
                     <span class="info-tip" data-tooltip="Compares your portfolio return against {{ benchmark.name }} over a 1-year timeline.">ⓘ</span>
                 </div>
-                <div class="metric-value {% if alpha >= 0 %}positive{% else %}negative{% endif %}">
-                    {{ "{:+.1f}%".format(alpha) }}
+                <div class="metric-value {% if alpha > 0 %}positive{% elif alpha < 0 %}negative{% endif %}">
+                    {% if total_invested > 0 %}
+                        {{ "{:+.1f}%".format(alpha) }}
+                    {% else %}
+                        0.0%
+                    {% endif %}
                 </div>
-                <div class="metric-desc">vs. {{ benchmark.name }} ({{ "{:+.1f}%".format(benchmark.return_pct) }})</div>
+                <div class="metric-desc">
+                    {% if total_invested > 0 %}
+                        vs. {{ benchmark.name }} ({{ "{:+.1f}%".format(benchmark.return_pct) }})
+                    {% else %}
+                        No active investments
+                    {% endif %}
+                </div>
             </div>
 
             <div class="metric-card">
@@ -533,7 +543,12 @@ DASHBOARD_TEMPLATE = """
 
         <div class="summary-card">
             <b>Quantitative Risk Assessment:</b><br>
-            • <b>Market Comparison:</b> Your active portfolio performance is currently <b>{{ "{:+.1f}%".format(alpha) }}</b> relative to the <b>{{ benchmark.name }}</b> index.<br>
+            • <b>Market Comparison:</b> 
+            {% if total_invested > 0 %}
+                Your active portfolio performance is currently <b>{{ "{:+.1f}%".format(alpha) }}</b> relative to the <b>{{ benchmark.name }}</b> index.<br>
+            {% else %}
+                No active holdings deployed to benchmark against <b>{{ benchmark.name }}</b>.<br>
+            {% endif %}
             • <b>Daily Risk Boundary:</b> On 95% of normal trading days, projected daily variation is modeled not to exceed <b>{{ sym }}{{ "{:,.2f}".format(daily_var) }}</b>.<br>
             • <b>Concentration & Balance:</b> Your largest active security represents <b>{{ "{:.1f}%".format(max_weight) }}</b> of total capital (<b>{{ conc_label }}</b>).
         </div>
@@ -1056,8 +1071,12 @@ def index():
     else:
         conc_label = "Well Diversified"
 
+    # Live Benchmark comparison (Nifty 50 for INR, S&P 500 for USD)
     benchmark_data = fetch_benchmark_return(display_curr)
-    alpha = portfolio_return_pct - benchmark_data["return_pct"]
+    if tot_inv > 0:
+        alpha = portfolio_return_pct - benchmark_data["return_pct"]
+    else:
+        alpha = 0.0
 
     mc_dict = run_monte_carlo(
         tot_cur, weighted_vol=portfolio_vol, weighted_mu=0.10
